@@ -1,3 +1,39 @@
+-- Creating a database and tables in the database accurately --
+create database project;
+use project;
+
+-- Creating a table "restaurants" in the database --
+create table restaurants(r_id INT UNIQUE, r_name CHAR(100), cuisine CHAR(100));
+select * from restaurants;
+
+-- Creating a table "users" in the database --
+create table users(user_id INT UNIQUE, name varchar(200) NOT NULL, email varchar(500) NOT NULL, passwords varchar(100) NOT NULL);  
+select * from users;
+
+-- Creating a table "delivery partner" in the database --
+create table delivery_partner(partner_id INT UNIQUE, partner_name varchar(200) NOT NULL);
+select * from delivery_partner;
+
+-- Creating a table "food" in the database --
+create table food(f_id INT UNIQUE, f_name varchar(200) NOT NULL, type varchar(200) NOT NULL);
+select * from food;
+
+-- Creating a table "menu" in the database --
+create table menu(menu_id INT UNIQUE, r_id INT NOT NULL, f_id INT NOT NULL, price INT NOT NULL);
+select * from menu;
+
+-- Creating a table "order_details" in the database --
+create table order_details(id INT UNIQUE, order_id INT NOT NULL, f_id INT NOT NULL);
+select * from order_details;
+
+-- Creating a table "orders" in the database --
+create table orders(order_id INT NOT NULL, user_id INT NOT NULL, r_id INT NOT NULL, amount INT NOT NULL, date DATE, partner_id INT NOT NULL, delivery_time INT NOT NULL, delivery_rating INT NOT NULL, restaurant_rating INT);
+select * from orders;
+
+
+-- -------------------------------------Queries and Solutions------------------------------------------ --
+
+
 -- Q1: Find customers who have never ordered. --
 
 select user_id, name
