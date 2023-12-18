@@ -1,108 +1,128 @@
-/* 1. Find customers who have never ordered food. */
-with cte as (
-	select *
-	from users u
-	left join orders o using(user_id))
-select name as cust_name
-from cte
-where order_id is null;
+use swiggy;
+
+-- Clean the 'orders' table
+
+alter table orders
+modify column date date;
+
+desc orders;
 
 
-/* 2. Find the average price per dish. */
-select round(avg(price)) as avg_price_per_dish
-from menu;
+-- Qus 1: Find customers who have never ordered.
+
+select user_id, name
+from users
+where user_id not in (select user_id from orders);
 
 
-/* 3. Find the top restaurant in terms of the number of orders for a given month. */
-with cte1 as (
-	select monthname(date) as month, r_id, count(order_id) as orders_cnt
-	from orders o
-	group by 1,2
-	order by 1),
-cte2 as (
-	select *, dense_rank() over(partition by month order by orders_cnt desc) as rnk
-	from cte1)
-select month, r.r_name, orders_cnt
-from cte2 c
-inner join restaurants r using(r_id)
-where rnk = 1;
+-- Qus 2: Average price per dish.
+
+select a.f_name, round(avg(b.price)) as Avg_price
+from food a
+inner join menu b on a.f_id = b.f_id
+group by a.f_name;
 
 
-/* 4. Find the monthly sales of restaurants where the monthly revenue is greater than 500. */
-with cte as (
-	select o.r_id, r.r_name, month(date) as month, sum(amount) as month_rev
-	from orders o
-	inner join restaurants r using(r_id)
-	group by 1,2,3
-	order by 1,3)
-select *
-from cte
-where month_rev > 500;
+-- Qus 3: Find top restaurants in terms of number of orders for a given month.
+
+select a.r_name as 'Restaurant', month(b.date) as 'Month', count(b.order_id) as 'Total Orders'
+from restaurants a
+inner join orders b on a.r_id = b.r_id
+group by a.r_name, month(b.date)
+order by month(b.date), 'Total Orders';
 
 
-/* 5. Show all orders with order details for a particular customer between 2022-06-01 and 2022-08-01. */
-select name, date, f_name, type, cuisine, r_name, amount, delivery_time, 
-	delivery_rating, partner_name, restaurant_rating
-from orders o
-left join order_details od using(order_id)
-left join food f using (f_id)
-left join users u using(user_id)
-left join restaurants r using(r_id)
-left join delivery_partners p using(partner_id)
-where date between '2022-06-01' and '2022-08-01' and name is not null
-order by 1,2;
+-- Qus 4: Restaurants with monthly sales more than x for
+
+-- For this question let's consider x=1000.
+
+select a.r_name as 'Restaurant', month(b.date) as 'Month', sum(b.amount) as Revenue
+from restaurants a
+inner join orders b on a.r_id = b.r_id
+group by a.r_name, month(b.date)
+having Revenue>500
+order by month(b.date), Revenue desc;
 
 
-/* 6. Find restaurants with max repeated customers. */
-with cte as (
-	select r_id, user_id, count(user_id) as cnt
-	from orders
-	group by 1,2
-	order by 1)
-select r.r_name, u.name
-from cte c
-left join users u using(user_id)
-left join restaurants r using(r_id)
-where cnt = (select max(cnt) from cte);
+-- Qus 5: Show all orders with order details for a particular customer in a particular date range.
+
+-- For this question let's check out the order details for customer 'Ankit' between 10 June 2022 and 10 July 2022.
+
+select a.name, b.date, c.r_name as 'Restaurant', e.f_name as 'Food name', count(b.order_id) as Total_orders, sum(b.amount) as Money_spent
+from users a
+inner join orders b on a.user_id = b.user_id
+inner join restaurants c on b.r_id = c.r_id
+inner join order_details d on b.order_id = d.order_id
+inner join food e on d.f_id = e.f_id
+where a.name like '%Ankit%' and b.date between '2022-06-10' and '2022-07-10'
+group by a.name, b.date, c.r_name, e.f_name
+order by b.date;
 
 
-/* 7. Month over month revenue growth of Swiggy. */
-with cte1 as (
-	select year(date) as year, month(date) as month, sum(amount) as revenue
-	from orders
-	group by 1,2),
-cte2 as (
-	select *, ifnull(lag(revenue) over(order by month asc),0) as prev_revenue
-	from cte1)
-select year, month,
-	if(prev_revenue <> 0, round(((revenue/prev_revenue)-1)*100,1), 0) as MoM_Growth
-from cte2;
+-- Qus 6: Find restaurants with maximum repeated customers.
+
+select d.r_name as 'Restaurant', count(c.Visits) as Repeated_customers from
+(select r_id, user_id, count(order_id) as Visits
+from orders
+group by r_id, user_id
+having Visits> 1) c
+inner join restaurants d on c.r_id = d.r_id
+group by d.r_name
+order by Repeated_customers desc
+limit 1;
 
 
-/* 8. Find each customers favourite food. */
-with cte1 as (
-	select user_id, f_name, count(*) as food_cnt
-	from orders o
-	left join order_details od using(order_id)
-	left join food f using(f_id)
-	group by 1, 2),
-cte2 as (
-	select *, dense_rank() over(partition by user_id order by food_cnt desc) as food_rnk
-	from cte1)
-select user_id, f_name as cust_favourite_food
-from cte2
-where food_rnk = 1;
+-- Qus 7: Month over month revenue growth of Swiggy.
+
+select c.*, c.Revenue - c.prv_month_rev as 'MoM_Revenue' from
+(select month(date) as 'Month', sum(amount) as Revenue, lag(sum(amount), 1) over() as prv_month_rev
+from orders
+group by month(date)
+order by month(date)) c;
 
 
-/* 9. Month-over-month revenue growth of a restaurant. */
-with cte1 as (
-	select r_id, year(date) as year, month(date) as month, sum(amount) as revenue
-	from orders
-	group by 1,2,3),
-cte2 as (
-	select *, ifnull(lag(revenue) over(partition by r_id order by month asc),0) as prev_revenue
-	from cte1)
-select r_id, concat(month,"-",year) as month_year,
-	if(prev_revenue <> 0, round(((revenue/prev_revenue)-1)*100,1), 0) as MoM_Growth
-from cte2
-order by 1,2;
+-- Qus 8: Favorite food of each customer.
+
+select e.user_id, e.name, e.`Food name`, e.Total_orders from
+(select a.user_id, b.name, d.f_name as 'Food name', count(a.order_id) as Total_orders, dense_rank() over(partition by a.user_id order by count(a.order_id) desc) as rnk
+from orders a
+inner join users b on a.user_id = b.user_id
+inner join order_details c on a.order_id = c.order_id
+inner join food d on c.f_id = d.f_id
+group by a.user_id, b.name, d.f_name
+order by a.user_id, Total_orders desc) e
+where e.rnk = 1;
+
+
+-- Qus 9: Find most loyal customers for all restaurants.
+
+select c.Restaurant, count(Visits) as Loyal_customers from
+(select a.user_id, a.r_id, b.r_name as 'Restaurant', count(a.order_id) as Visits
+from orders a
+inner join restaurants b on a.r_id = b.r_id
+group by a.user_id, a.r_id, b.r_name
+having count(a.order_id) > 1
+order by a.user_id, Visits desc) c
+group by c.Restaurant
+order by Loyal_customers desc;
+
+
+-- Qus 10: Month over month revenue growth of each restaurant.
+
+select c.*, concat(round(((c.Revenue - c.prv_month_rev)/c.prv_month_rev)*100, 2),'%') as 'MoM_growth' from
+(select month(date) as 'Month', sum(amount) as Revenue, lag(sum(amount), 1) over() as prv_month_rev
+from orders
+group by month(date)
+order by month(date)) c;
+
+
+-- Qus 11: Most paired products.
+
+select f1.f_name as product1, f2.f_name as product2, count(*) as pair_counts
+from order_details od1
+inner join order_details od2 on od1.order_id = od2.order_id and od1.f_id < od2.f_id
+inner join food f1 on od1.f_id = f1.f_id
+inner join food f2 on od2.f_id = f2.f_id
+group by f1.f_name, f2.f_name
+order by pair_counts desc
+limit 1;
