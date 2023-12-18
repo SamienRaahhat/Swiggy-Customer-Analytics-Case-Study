@@ -126,3 +126,13 @@ inner join food f2 on od2.f_id = f2.f_id
 group by f1.f_name, f2.f_name
 order by pair_counts desc
 limit 1;
+
+
+-- Q12: Find the most common cuisine amongst all the restaurants? 
+
+select cuisine, count(*) as cuisine_count
+from restaurants
+group by cuisine
+order by cuisine desc
+limit 1;
+
